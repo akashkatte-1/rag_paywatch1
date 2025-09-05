@@ -4,3 +4,5 @@ __pycache__/
 uv.lock
 pyproject.toml
 attached_assets/
+vector_storage/
+.vscode/
