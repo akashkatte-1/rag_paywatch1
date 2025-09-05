@@ -1,0 +1,6 @@
+.env
+myenv/
+__pycache__/
+uv.lock
+pyproject.toml
+attached_assets/

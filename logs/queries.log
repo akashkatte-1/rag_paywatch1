@@ -1,0 +1,5 @@
+2025-09-05 15:41:17,219 - rag_queries - INFO - {"query": "What is the file name?", "response_length": 156, "processing_time": 4.292327880859375, "sources_used": 0, "user_id": "api_user", "timestamp": "2025-09-05T15:41:17.219649"}
+2025-09-05 15:41:44,758 - rag_queries - INFO - {"query": "What is the highest ctc?", "response_length": 97, "processing_time": 8.686230659484863, "sources_used": 0, "user_id": "api_user", "timestamp": "2025-09-05T15:41:44.758953"}
+2025-09-05 15:50:50,835 - rag_queries - INFO - {"query": "What is the lowest ctc?", "response_length": 92, "processing_time": 4.966350793838501, "sources_used": 0, "user_id": "api_user", "timestamp": "2025-09-05T15:50:50.835187"}
+2025-09-05 16:02:52,167 - rag_queries - INFO - {"query": "What is the lowest ctc?", "response_length": 150, "processing_time": 7.6154046058654785, "sources_used": 0, "user_id": "api_user", "timestamp": "2025-09-05T16:02:52.167873"}
+2025-09-05 16:03:17,665 - rag_queries - INFO - {"query": "What is the highest ctc?", "response_length": 156, "processing_time": 9.688061237335205, "sources_used": 0, "user_id": "api_user", "timestamp": "2025-09-05T16:03:17.665726"}
