@@ -1,8 +1,8 @@
-# RAG-Based Excel Q\&A Bot 🤖
+# RAG-Based Excel Q\&A Bot -PayWATCH 🤖
 
 # Overview
 
-This is a comprehensive RAG (Retrieval-Augmented Generation) application backend built with FastAPI for HR data analysis. The system specializes in processing Excel files containing candidate data (names, experience, locations, CTC/salary information) and providing conversational AI capabilities for querying this data. It features semantic search using FAISS vector database, automated currency conversion from INR to USD, and comprehensive logging for monitoring and analytics.
+This is a comprehensive RAG (Retrieval-Augmented Generation) application backend built with FastAPI for HR data analysis. The system specializes in processing Excel files containing candidate data (names, experience, locations, CTC/salary information) and providing conversational AI capabilities for querying this data. It features semantic search using chromaDBvector database, automated currency conversion from INR to USD, and comprehensive logging for monitoring and analytics.
 
 **Status**: Fully implemented and running on port 5000. All core functionality is operational including file upload, vector search, natural language querying, and real-time currency conversion.
 
@@ -16,7 +16,7 @@ Preferred communication style: Simple, everyday language.
 **FastAPI with Python**: Chosen for its high performance, automatic API documentation, and excellent async support. The application uses a modular service-oriented architecture with clear separation of concerns across models, services, and security layers.
 
 ## Vector Database and Search
-**FAISS (Facebook AI Similarity Search)**: Implemented for efficient semantic similarity search on candidate data. Documents are embedded using OpenAI's text-embedding-3-small model and stored in a persistent FAISS index. This enables natural language querying of HR data with semantic understanding rather than simple keyword matching.
+**chromaDB(Facebook AI Similarity Search)**: Implemented for efficient semantic similarity search on candidate data. Documents are embedded using OpenAI's text-embedding-3-small model and stored in a persistent chromaDBindex. This enables natural language querying of HR data with semantic understanding rather than simple keyword matching.
 
 ## AI and Language Model Integration
 **OpenAI GPT-4 with Function Calling**: The system uses GPT-4 as the core conversational agent with a sophisticated tool-calling architecture. The agent has access to specialized tools for:
@@ -41,7 +41,7 @@ Preferred communication style: Simple, everyday language.
 
 ## Data Persistence
 **Multi-layer Storage Strategy**:
-- FAISS binary index for vector embeddings
+- chromaDBbinary index for vector embeddings
 - Pickle serialization for document metadata
 - Original DataFrame persistence for direct data operations
 - Cache-based storage for exchange rates (30-minute TTL)
