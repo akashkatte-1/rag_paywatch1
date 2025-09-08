@@ -21,13 +21,17 @@ class QueryResponse(BaseModel):
     answer: str = Field(..., description="Generated answer from the RAG system")
     processing_time: float = Field(..., description="Time taken to process the query in seconds")
     sources_used: int = Field(..., description="Number of documents retrieved for context")
+    retrieved_docs: Optional[List[str]] = Field(
+        None, description="Optional list of document names or IDs used in generating the answer"
+    )
     
     class Config:
         json_schema_extra = {
             "example": {
                 "answer": "Based on the data, the average CTC for candidates with Python skills is $45,000 USD per year.",
                 "processing_time": 1.23,
-                "sources_used": 5
+                "sources_used": 5,
+                "retrieved_docs": ["employee_data.xlsx", "python_candidates.csv"]
             }
         }
 
@@ -37,7 +41,7 @@ class UploadResponse(BaseModel):
     message: str = Field(..., description="Upload status message")
     filename: str = Field(..., description="Name of the uploaded file")
     records_processed: int = Field(..., description="Number of records processed")
-    vector_count: int = Field(..., description="Number of vectors stored in FAISS")
+    vectors_stored: int = Field(..., description="Number of vectors stored in the vector database")
     
     class Config:
         json_schema_extra = {
@@ -45,7 +49,7 @@ class UploadResponse(BaseModel):
                 "message": "File uploaded and processed successfully",
                 "filename": "employee_data.xlsx",
                 "records_processed": 150,
-                "vector_count": 150
+                "vectors_stored": 150
             }
         }
 
@@ -103,13 +107,15 @@ class ErrorResponse(BaseModel):
     error: str = Field(..., description="Error type")
     detail: str = Field(..., description="Error details")
     timestamp: datetime = Field(default_factory=datetime.now)
+    code: Optional[int] = Field(None, description="Optional HTTP status code")
     
     class Config:
         json_schema_extra = {
             "example": {
                 "error": "ValidationError",
                 "detail": "Invalid file format. Only .xlsx and .xls files are supported.",
-                "timestamp": "2024-01-15T10:30:00Z"
+                "timestamp": "2024-01-15T10:30:00Z",
+                "code": 400
             }
         }
 
@@ -119,7 +125,8 @@ class CandidateData(BaseModel):
     name: str
     location: str
     ctc_inr: float = Field(..., description="CTC in Indian Rupees (LPA)")
-    skills: str
+    ctc_usd: Optional[float] = Field(None, description="Optional CTC converted to USD")
+    skills: List[str] = Field(..., description="List of candidate skills")
     experience: str = Field(..., description="Experience in years/months format")
     
     class Config:
@@ -128,7 +135,8 @@ class CandidateData(BaseModel):
                 "name": "John Doe",
                 "location": "Bangalore",
                 "ctc_inr": 12.5,
-                "skills": "Python, Django, React, AWS",
+                "ctc_usd": 0.15,
+                "skills": ["Python", "Django", "React", "AWS"],
                 "experience": "3y 6m"
             }
         }

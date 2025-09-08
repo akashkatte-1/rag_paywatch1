@@ -1,0 +1,1 @@
+{"timestamp": "2025-09-08T23:01:43.171855", "log_type": "uploads", "event": "file_upload", "data": {"filename": "Android(0-2).xlsx", "file_size": 290181, "records_processed": 2859, "vector_count": 2859, "success": true, "error_message": null, "timestamp": "2025-09-08T23:01:43.171021"}}

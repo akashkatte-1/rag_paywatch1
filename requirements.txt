@@ -2,7 +2,7 @@ fastapi==0.116.1
 uvicorn==0.35.0
 pandas==2.3.2
 openpyxl==3.1.5
-faiss-cpu==1.12.0
+chromadb
 openai==1.106.1
 python-multipart==0.0.20
 requests==2.32.5
