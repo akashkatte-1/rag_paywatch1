@@ -76,65 +76,72 @@ Preferred communication style: Simple, everyday language.
 - **Environment Variables**: API key management for OpenAI and optional custom API keys
 - **JSON Logging**: Structured logging with timestamp-based file organization
 
+# API Endpoints
 
+## 1. Health Check
+- **Method:** GET  
+- **URL:** `http://127.0.0.1:8001/health`  
+- **Headers:** None required  
 
-1. Health Check
-Method: GET
-URL: http://127.0.0.1:8001/health
-Headers: None required
-Expected Response:
+**Expected Response:**
+```json
 {
   "status": "healthy",
   "vector_count": 0,
   "documents_count": 0
 }
-2. Upload Excel File
-Method: POST
-URL: http://127.0.0.1:8001/upload-excel/
-Headers:
-X-API-Key: sk-rag-a1MejQYr3A4e_TfRZxhPDBDME9-Ioud0vM1TC_wQgpQ
-Body:
-Select "form-data"
-Key: file (change type to "File")
-Value: Upload your .xlsx/.xls file
-Expected Response:
+```
+## 2. Upload Excel File
+- **Method:** POST  
+- **URL:** `http://127.0.0.1:8001/upload-excel/`  
+- **Headers:**  
+  - `X-API-Key: sk-rag-a1MejQYr3A4e_TfRZxhPDBDME9-Ioud0vM1TC_wQgpQ`  
+- **Body:** Form-data  
+  - Key: `file` (type: File)  
+  - Value: Upload your `.xlsx` or `.xls` file  
+
+**Expected Response:**
+```json
 {
   "message": "File uploaded and processed successfully",
   "filename": "your_file.xlsx",
   "records_processed": 150,
   "vector_count": 150
 }
-3. Query Your Data
-Method: POST
-URL: http://127.0.0.1:8001/query/
-Headers:
-X-API-Key: sk-rag-a1MejQYr3A4e_TfRZxhPDBDME9-Ioud0vM1TC_wQgpQ
-Content-Type: application/json
-Body (raw JSON):
+```
+## 3. Query Your Data
+- **Method:** POST  
+- **URL:** `http://127.0.0.1:8001/query/`  
+- **Headers:**  
+  - `X-API-Key: sk-rag-a1MejQYr3A4e_TfRZxhPDBDME9-Ioud0vM1TC_wQgpQ`  
+  - `Content-Type: application/json`  
+- **Body (raw JSON):**
+```json
 {
   "question": "What is the average CTC for Python developers?"
 }
-Expected Response:
-{
-  "answer": "Based on the data, the average CTC for Python developers is $45,000 USD per year.",
-  "processing_time": 1.23,
-  "sources_used": 5
-}
-4. Get Logs
-Method: GET
-URL: http://127.0.0.1:8001/logs/?date=20250904&log_type=all
-Headers:
-X-API-Key: sk-rag-a1MejQYr3A4e_TfRZxhPDBDME9-Ioud0vM1TC_wQgpQ
-Query Parameters:
-date: 20250904 (YYYYMMDD format)
-log_type: all (or queries, uploads, errors)
-5. Get Statistics
-Method: GET
-URL: http://127.0.0.1:8001/stats/
-Headers:
-X-API-Key: sk-rag-a1MejQYr3A4e_TfRZxhPDBDME9-Ioud0vM1TC_wQgpQ
-Important Notes:
-Always include the X-API-Key header for authentication
-For file uploads, use "form-data" body type
-For queries, use "raw JSON" body type
-The system automatically converts all CTC values from INR to USD
+```
+## 4. Get Logs
+- **Method:** GET  
+- **URL:** `http://127.0.0.1:8001/logs/?date=20250904&log_type=all`  
+- **Headers:**  
+  - `X-API-Key: sk-rag-a1MejQYr3A4e_TfRZxhPDBDME9-Ioud0vM1TC_wQgpQ`  
+- **Query Parameters:**  
+  - `date`: `20250904` (YYYYMMDD format)  
+  - `log_type`: `all` (or `queries`, `uploads`, `errors`)  
+
+---
+
+## 5. Get Statistics
+- **Method:** GET  
+- **URL:** `http://127.0.0.1:8001/stats/`  
+- **Headers:**  
+  - `X-API-Key: sk-rag-a1MejQYr3A4e_TfRZxhPDBDME9-Ioud0vM1TC_wQgpQ`  
+
+---
+
+### Important Notes
+- Always include the `X-API-Key` header for authentication.  
+- For file uploads, use **form-data** body type.  
+- For queries, use **raw JSON** body type.  
+- The system automatically converts all CTC values from INR to USD.
