@@ -3,8 +3,9 @@ load_dotenv()
 
 import os
 import re
-import time
+import time  # Ensure time is imported for delays
 import pickle
+import json
 from io import BytesIO
 from pathlib import Path
 from typing import List, Dict, Any, Optional, Tuple
@@ -40,7 +41,7 @@ class RAGService:
         self.dataframe: Optional[pd.DataFrame] = None
         self._load_persistent_data()
 
-        # Tools
+        # Tools definition... (omitted for brevity, same as before)
         self.tools = [
             {
                 "type": "function",
@@ -94,66 +95,113 @@ class RAGService:
         except Exception as e:
             logging_service.log_error("data_save_error", str(e), {})
 
-    # ---------------- File ingestion ---------------- #
+    # ---------------- File ingestion (with batch processing) ---------------- #
     def process_excel_file(self, file_content: bytes, filename: str) -> Dict[str, Any]:
         """
         Process an Excel file: clean, convert CTC, generate embeddings, and store in ChromaDB.
-        Supports multiple files without overwriting previous data.
-        Returns records processed and vectors stored.
+        Uses batch processing to handle large files and API limits.
         """
-        # ---------------- Load Excel ---------------- #
+        # 1. Load Excel Data
         df = pd.read_excel(BytesIO(file_content))
 
-        # Drop Name column if present
         if "Name" in df.columns:
             df = df.drop(columns=["Name"])
 
-        # Clean & validate dataframe
+        # 2. Clean & Validate Dataframe
         valid_df, _ = self._clean_and_validate_dataframe(df)
+
+        # 3. Check for Empty Dataframe after cleaning
+        if valid_df.empty:
+            logging_service.log_application_event(
+                "empty_dataframe",
+                f"No valid data found in file {filename} after cleaning.",
+                {"filename": filename}
+            )
+            return {"records_processed": 0, "vectors_stored": 0}
+
+        # Prepare dataframe for processing: add unique row index and source file tracking
         valid_df = valid_df.reset_index(drop=False).rename(columns={"index": "row_index"})
         valid_df["source_file"] = filename
 
-        # Append to existing dataframe
+        # 4. Append new data to master dataframe and save state
         if self.dataframe is None or self.dataframe.empty:
             self.dataframe = valid_df.copy()
         else:
             self.dataframe = pd.concat([self.dataframe, valid_df], ignore_index=True)
-
         self._save_persistent_data()
 
-        # ---------------- Generate batch embeddings ---------------- #
-        texts = [
-            str(row["Skills"]) + " " + str(row["CTC"]) + " " + str(row["Exp_years"])
-            for _, row in valid_df.iterrows()
-        ]
-        embeddings_response = self.openai_client.embeddings.create(
-            model=self.embedding_model,
-            input=texts
-        )
-        embeddings = [d["embedding"] for d in embeddings_response["data"]]
+        # 5. Process data in batches for embedding generation and storage
+        batch_size = 500  # Conservative batch size for OpenAI API and ChromaDB stability
+        total_processed = 0
+        total_stored = 0
+        num_batches = (len(valid_df) // batch_size) + (1 if len(valid_df) % batch_size > 0 else 0)
 
-        # ---------------- Prepare IDs and metadata ---------------- #
-        ids = [f"{filename}_{row['row_index']}" for _, row in valid_df.iterrows()]
-        metadatas = [row.to_dict() for _, row in valid_df.iterrows()]
-        documents = [str(row.to_dict()) for _, row in valid_df.iterrows()]
+        for i in range(num_batches):
+            start_index = i * batch_size
+            end_index = min((i + 1) * batch_size, len(valid_df))
+            batch_df = valid_df.iloc[start_index:end_index]
 
-        # ---------------- Add to ChromaDB ---------------- #
-        try:
-            self.collection.add(
-                ids=ids,
-                embeddings=embeddings,
-                metadatas=metadatas,
-                documents=documents
-            )
-        except Exception as e:
-            logging_service.log_error("chroma_add_error", str(e), {"file": filename})
-            raise Exception(f"Error adding embeddings to ChromaDB: {e}")
+            if batch_df.empty:
+                continue
+
+            # --- Generate texts for batch ---
+            texts = [
+                f"Skills: {row['Skills']}, CTC: {row['CTC']}, Experience: {row['Exp_years']} years"
+                for _, row in batch_df.iterrows()
+            ]
+
+            # --- Generate embeddings for batch ---
+            try:
+                embeddings_response = self.openai_client.embeddings.create(
+                    model=self.embedding_model,
+                    input=texts
+                )
+                embeddings = [d.embedding for d in embeddings_response.data]
+            except Exception as e:
+                error_context = {
+                    "filename": filename,
+                    "batch_index": i + 1,
+                    "num_batches": num_batches,
+                    "batch_size": len(batch_df),
+                    "error": str(e)
+                }
+                logging_service.log_error("embedding_api_error", f"OpenAI API error during batch processing: {e}", error_context)
+                raise Exception(f"Error generating embeddings for batch starting at index {start_index}: {e}")
+
+            # --- Prepare data for ChromaDB for this batch ---
+            ids = [f"{filename}_{row['row_index']}" for _, row in batch_df.iterrows()]
+            metadatas = [row.to_dict() for _, row in batch_df.iterrows()]
+            documents = [str(row.to_dict()) for _, row in batch_df.iterrows()]
+
+            # --- Add batch to ChromaDB ---
+            try:
+                self.collection.add(
+                    ids=ids,
+                    embeddings=embeddings,
+                    metadatas=metadatas,
+                    documents=documents
+                )
+                total_stored += len(ids)
+            except Exception as e:
+                error_context = {
+                    "filename": filename,
+                    "batch_index": i + 1,
+                    "num_batches": num_batches,
+                    "error": str(e)
+                }
+                logging_service.log_error("chroma_add_error", f"ChromaDB error during batch add: {e}", error_context)
+                raise Exception(f"Error adding embeddings to ChromaDB for batch starting at index {start_index}: {e}")
+
+            total_processed += len(batch_df)
+            
+            # Add a small delay between batches to avoid potential rate limiting issues on very large files
+            if num_batches > 1 and i < num_batches - 1:
+                time.sleep(0.5)  # 500ms delay
 
         return {
-            "records_processed": len(valid_df),
-            "vectors_stored": len(valid_df)
+            "records_processed": total_processed,
+            "vectors_stored": total_stored
         }
-
 
     def _parse_experience(self, exp_str: str) -> float:
         exp_str = str(exp_str).lower().replace("years", "yrs").replace("year", "yr").replace("months", "m")
@@ -232,7 +280,8 @@ class RAGService:
                 all_results, source_files = [], set()
                 for tool_call in message.tool_calls:
                     fn_name = tool_call.function.name
-                    fn_args = eval(tool_call.function.arguments)
+                    # ✅ Use json.loads instead of eval for security
+                    fn_args = json.loads(tool_call.function.arguments)
                     fn_result = self._execute_function_call(fn_name, fn_args)
                     all_results.append(fn_result)
                     if isinstance(fn_result, list):
