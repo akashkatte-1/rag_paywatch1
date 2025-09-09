@@ -5443,3 +5443,5 @@
 2025-09-09 01:30:54,162 - rag_app - INFO - {"event_type": "app_shutdown", "message": "RAG Application shutting down", "metadata": {}, "timestamp": "2025-09-09T01:30:54.162270"}
 2025-09-09 01:30:56,693 - rag_app - INFO - {"event_type": "app_startup", "message": "RAG Application started successfully", "metadata": {"api_key": "sk-rag-a1M..."}, "timestamp": "2025-09-09T01:30:56.693212"}
 2025-09-09 01:31:41,236 - rag_app - INFO - {"event_type": "app_shutdown", "message": "RAG Application shutting down", "metadata": {}, "timestamp": "2025-09-09T01:31:41.235994"}
+2025-09-09 10:45:29,464 - rag_app - INFO - {"event_type": "app_startup", "message": "RAG Application started successfully", "metadata": {"api_key": "sk-rag-a1M..."}, "timestamp": "2025-09-09T10:45:29.464783"}
+2025-09-09 11:13:48,364 - rag_app - INFO - {"event_type": "app_shutdown", "message": "RAG Application shutting down", "metadata": {}, "timestamp": "2025-09-09T11:13:48.364780"}
