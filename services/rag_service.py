@@ -95,64 +95,50 @@ class RAGService:
             logging_service.log_error("data_save_error", str(e), {})
 
     # ---------------- File ingestion ---------------- #
-    def process_excel_file(self, file_content: bytes, filename: str) -> Dict[str, Any]:
-        """
-        Process an Excel file: clean, convert CTC, generate embeddings, and store in ChromaDB.
-        Supports multiple files without overwriting previous data.
-        Returns records processed and vectors stored.
-        """
-        # ---------------- Load Excel ---------------- #
-        df = pd.read_excel(BytesIO(file_content))
-
-        # Drop Name column if present
-        if "Name" in df.columns:
-            df = df.drop(columns=["Name"])
-
-        # Clean & validate dataframe
-        valid_df, _ = self._clean_and_validate_dataframe(df)
-        valid_df = valid_df.reset_index(drop=False).rename(columns={"index": "row_index"})
-        valid_df["source_file"] = filename
-
-        # Append to existing dataframe
-        if self.dataframe is None or self.dataframe.empty:
-            self.dataframe = valid_df.copy()
-        else:
-            self.dataframe = pd.concat([self.dataframe, valid_df], ignore_index=True)
-
-        self._save_persistent_data()
-
-        # ---------------- Generate batch embeddings ---------------- #
-        texts = [
-            str(row["Skills"]) + " " + str(row["CTC"]) + " " + str(row["Exp_years"])
-            for _, row in valid_df.iterrows()
-        ]
-        embeddings_response = self.openai_client.embeddings.create(
-            model=self.embedding_model,
-            input=texts
-        )
-        embeddings = [d["embedding"] for d in embeddings_response["data"]]
-
-        # ---------------- Prepare IDs and metadata ---------------- #
-        ids = [f"{filename}_{row['row_index']}" for _, row in valid_df.iterrows()]
-        metadatas = [row.to_dict() for _, row in valid_df.iterrows()]
-        documents = [str(row.to_dict()) for _, row in valid_df.iterrows()]
-
-        # ---------------- Add to ChromaDB ---------------- #
+    def process_excel_file(self, file_path: str, filename: str):
         try:
+            start_time = time.time()
+            df = pd.read_excel(file_path)
+
+            if "Name" in df.columns:
+                df = df.drop(columns=["Name"])
+
+            records = df.to_dict(orient="records")
+            texts = [str(r) for r in records]
+
+            # ✅ FIX: OpenAI embeddings new SDK
+            embeddings_response = self.openai_client.embeddings.create(
+                model=self.embedding_model,
+                input=texts
+            )
+            embeddings = [d.embedding for d in embeddings_response.data]
+
+            ids = [str(uuid.uuid4()) for _ in range(len(records))]
+
+            # Store into Chroma
             self.collection.add(
                 ids=ids,
                 embeddings=embeddings,
-                metadatas=metadatas,
-                documents=documents
+                documents=texts,
+                metadatas=[{"filename": filename}] * len(texts)
             )
-        except Exception as e:
-            logging_service.log_error("chroma_add_error", str(e), {"file": filename})
-            raise Exception(f"Error adding embeddings to ChromaDB: {e}")
 
-        return {
-            "records_processed": len(valid_df),
-            "vectors_stored": len(valid_df)
-        }
+            vectors_stored = len(records)
+            processing_time = round(time.time() - start_time, 2)
+
+            log_event("uploads", f"Uploaded {filename}", {
+                "records": vectors_stored,
+                "time": processing_time
+            })
+
+            return {
+                "records_processed": vectors_stored,
+                "vectors_stored": vectors_stored
+            }
+        except Exception as e:
+            log_event("errors", f"Upload failed: {filename}", {"error": str(e)})
+            raise
+
 
 
     def _parse_experience(self, exp_str: str) -> float:
@@ -217,50 +203,51 @@ class RAGService:
             return self.get_ctc_statistics(args.get("filter_conditions"))
         return None
 
-    def query(self, question: str) -> QueryResponse:
-        start = time.time()
+    def query(self, question: str):
         try:
-            response = self.openai_client.chat.completions.create(
-                model=self.llm_model,
-                messages=[{"role": "user", "content": question}],
-                tools=self.tools,
-                tool_choice="auto",
+            start_time = time.time()
+
+            # Embed query
+            q_embedding = self.openai_client.embeddings.create(
+                model=self.embedding_model,
+                input=question
+            ).data[0].embedding
+
+            # Search in Chroma
+            results = self.collection.query(
+                query_embeddings=[q_embedding],
+                n_results=5
             )
-            message = response.choices[0].message
 
-            if message.tool_calls:
-                all_results, source_files = [], set()
-                for tool_call in message.tool_calls:
-                    fn_name = tool_call.function.name
-                    fn_args = eval(tool_call.function.arguments)
-                    fn_result = self._execute_function_call(fn_name, fn_args)
-                    all_results.append(fn_result)
-                    if isinstance(fn_result, list):
-                        for row in fn_result:
-                            if "source_file" in row:
-                                source_files.add(row["source_file"])
+            docs = results.get("documents", [[]])[0]
+            context = "\n".join(docs) if docs else "No relevant context found."
 
-                # Summarize into natural answer
-                summary_prompt = [
-                    {"role": "system", "content": "You are a helpful assistant that summarizes database query results."},
-                    {"role": "user", "content": f"Question: {question}\nResults: {all_results}\nSummarize briefly."},
+            # Call LLM
+            completion = self.openai_client.chat.completions.create(
+                model=self.chat_model,
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that analyzes Excel data."},
+                    {"role": "user", "content": f"Question: {question}\nContext: {context}"}
                 ]
-                summary = self.openai_client.chat.completions.create(model=self.llm_model, messages=summary_prompt)
-                final_answer = summary.choices[0].message.content
-
-                sources_used = len(all_results)
-            else:
-                final_answer, sources_used, source_files = message.content or "No answer generated.", 0, set()
-
-            return QueryResponse(
-                answer=final_answer,
-                processing_time=round(time.time() - start, 2),
-                sources_used=sources_used,
-                source_files=list(source_files),
             )
-        except Exception as e:
-            raise Exception(f"Error processing query: {e}")
 
+            answer = completion.choices[0].message.content
+            processing_time = round(time.time() - start_time, 2)
+
+            log_event("queries", f"Query executed: {question}", {
+                "sources_used": len(docs),
+                "time": processing_time
+            })
+
+            return {
+                "answer": answer,
+                "processing_time": processing_time,
+                "sources_used": len(docs)
+            }
+
+        except Exception as e:
+            log_event("errors", "Query failed", {"error": str(e)})
+            raise
 
 # Singleton
 rag_service = RAGService()
